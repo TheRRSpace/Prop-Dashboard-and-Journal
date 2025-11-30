@@ -60,6 +60,12 @@ export default function JournalPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // filters for table and stats
+  const [instrumentFilter, setInstrumentFilter] = useState("ALL");
+  const [resultFilter, setResultFilter] = useState("ALL");
+  const [macroFilter, setMacroFilter] = useState("ALL");
+  const [planFilter, setPlanFilter] = useState("ALL");
+
   useEffect(() => {
     setTrades(loadTrades());
   }, []);
@@ -69,21 +75,48 @@ export default function JournalPage() {
   }, [trades]);
 
   // simple stats
+
+  // trades after applying filters
+  const filteredTrades = useMemo(() => {
+    return trades.filter((t) => {
+      // Instrument filter
+      if (instrumentFilter !== "ALL" && t.instrument !== instrumentFilter) {
+        return false;
+      }
+
+      // Result filter
+      if (resultFilter === "WINS" && t.resultR <= 0) return false;
+      if (resultFilter === "LOSSES" && t.resultR >= 0) return false;
+
+      // Macro filter
+      if (macroFilter !== "ALL" && t.macroAlignment !== macroFilter) {
+        return false;
+      }
+
+      // Plan filter
+      if (planFilter === "YES" && !t.followedPlan) return false;
+      if (planFilter === "NO" && t.followedPlan) return false;
+
+      return true;
+    });
+  }, [trades, instrumentFilter, resultFilter, macroFilter, planFilter]);
+
   const stats = useMemo(() => {
-    if (trades.length === 0) {
+    if (filteredTrades.length === 0) {
       return {
         total: 0,
         winRate: 0,
         avgR: 0,
       };
     }
-    const total = trades.length;
-    const wins = trades.filter((t) => t.resultR > 0).length;
+
+    const total = filteredTrades.length;
+    const wins = filteredTrades.filter((t) => t.resultR > 0).length;
     const winRate = (wins / total) * 100;
-    const avgR = trades.reduce((sum, t) => sum + t.resultR, 0) / total;
+    const avgR = filteredTrades.reduce((sum, t) => sum + t.resultR, 0) / total;
 
     return { total, winRate, avgR };
-  }, [trades]);
+  }, [filteredTrades]);
 
   function startEdit(trade: Trade) {
     setEditingId(trade.id);
@@ -423,6 +456,65 @@ export default function JournalPage() {
         {/* Trades list */}
         <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Trades</h2>
+          <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-slate-300">
+            {/* Instrument filter */}
+            <label className="flex items-center gap-1">
+              <span>Instrument:</span>
+              <select
+                value={instrumentFilter}
+                onChange={(e) => setInstrumentFilter(e.target.value)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+              >
+                <option value="ALL">All</option>
+                <option value="XAUUSD">XAUUSD</option>
+                <option value="EURUSD">EURUSD</option>
+              </select>
+            </label>
+
+            {/* Result filter */}
+            <label className="flex items-center gap-1">
+              <span>Result:</span>
+              <select
+                value={resultFilter}
+                onChange={(e) => setResultFilter(e.target.value)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+              >
+                <option value="ALL">All</option>
+                <option value="WINS">Wins</option>
+                <option value="LOSSES">Losses</option>
+              </select>
+            </label>
+
+            {/* Macro filter */}
+            <label className="flex items-center gap-1">
+              <span>Macro:</span>
+              <select
+                value={macroFilter}
+                onChange={(e) => setMacroFilter(e.target.value)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+              >
+                <option value="ALL">All</option>
+                <option value="With">With</option>
+                <option value="Against">Against</option>
+                <option value="Neutral">Neutral</option>
+              </select>
+            </label>
+
+            {/* Plan filter */}
+            <label className="flex items-center gap-1">
+              <span>Plan:</span>
+              <select
+                value={planFilter}
+                onChange={(e) => setPlanFilter(e.target.value)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+              >
+                <option value="ALL">All</option>
+                <option value="YES">Followed</option>
+                <option value="NO">Broke</option>
+              </select>
+            </label>
+          </div>
+
           <div className="max-h-80 overflow-auto text-xs">
             <table className="min-w-full border-t border-slate-800">
               <thead className="sticky top-0 bg-slate-900">
@@ -444,7 +536,7 @@ export default function JournalPage() {
                 </tr>
               </thead>
               <tbody>
-                {trades.map((t, idx) => (
+                {filteredTrades.map((t, idx) => (
                   <tr
                     key={t.id}
                     className={
@@ -530,13 +622,13 @@ export default function JournalPage() {
                   </tr>
                 ))}
 
-                {trades.length === 0 && (
+                {filteredTrades.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       className="px-3 py-4 text-center text-slate-500"
                     >
-                      No trades logged yet.
+                      No trades match the current filters.
                     </td>
                   </tr>
                 )}
