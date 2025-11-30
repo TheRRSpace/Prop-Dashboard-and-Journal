@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+
 // Basic trade type
 type Trade = {
   id: string;
@@ -74,8 +84,6 @@ export default function JournalPage() {
     saveTrades(trades);
   }, [trades]);
 
-  // simple stats
-
   // trades after applying filters
   const filteredTrades = useMemo(() => {
     return trades.filter((t) => {
@@ -103,19 +111,80 @@ export default function JournalPage() {
 
   const stats = useMemo(() => {
     if (filteredTrades.length === 0) {
-      return {
-        total: 0,
-        winRate: 0,
-        avgR: 0,
-      };
+      return { total: 0, winRate: 0, avgR: 0, totalR: 0 };
     }
 
     const total = filteredTrades.length;
     const wins = filteredTrades.filter((t) => t.resultR > 0).length;
+    const sumR = filteredTrades.reduce((sum, t) => sum + t.resultR, 0);
     const winRate = (wins / total) * 100;
-    const avgR = filteredTrades.reduce((sum, t) => sum + t.resultR, 0) / total;
+    const avgR = sumR / total;
 
-    return { total, winRate, avgR };
+    return { total, winRate, avgR, totalR: sumR };
+  }, [filteredTrades]);
+
+  const macroStats = useMemo(() => {
+    const withMacro = filteredTrades.filter((t) => t.macroAlignment === "With");
+    const againstMacro = filteredTrades.filter(
+      (t) => t.macroAlignment === "Against"
+    );
+
+    const avgWith =
+      withMacro.length === 0
+        ? 0
+        : withMacro.reduce((sum, t) => sum + t.resultR, 0) / withMacro.length;
+
+    const avgAgainst =
+      againstMacro.length === 0
+        ? 0
+        : againstMacro.reduce((sum, t) => sum + t.resultR, 0) /
+          againstMacro.length;
+
+    return {
+      withCount: withMacro.length,
+      againstCount: againstMacro.length,
+      avgWith,
+      avgAgainst,
+    };
+  }, [filteredTrades]);
+
+  const planStats = useMemo(() => {
+    const planYes = filteredTrades.filter((t) => t.followedPlan);
+    const planNo = filteredTrades.filter((t) => !t.followedPlan);
+
+    const avgYes =
+      planYes.length === 0
+        ? 0
+        : planYes.reduce((sum, t) => sum + t.resultR, 0) / planYes.length;
+
+    const avgNo =
+      planNo.length === 0
+        ? 0
+        : planNo.reduce((sum, t) => sum + t.resultR, 0) / planNo.length;
+
+    return {
+      yesCount: planYes.length,
+      noCount: planNo.length,
+      avgYes,
+      avgNo,
+    };
+  }, [filteredTrades]);
+
+  const riskStats = useMemo(() => {
+    if (filteredTrades.length === 0) {
+      return { avgRisk: 0, maxRisk: 0 };
+    }
+
+    const avgRisk =
+      filteredTrades.reduce((sum, t) => sum + t.riskPercent, 0) /
+      filteredTrades.length;
+
+    const maxRisk = filteredTrades.reduce(
+      (max, t) => Math.max(max, t.riskPercent),
+      0
+    );
+
+    return { avgRisk, maxRisk };
   }, [filteredTrades]);
 
   function startEdit(trade: Trade) {
@@ -434,21 +503,82 @@ export default function JournalPage() {
 
         {/* Stats */}
         <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-200">Stats</h2>
-          <div className="grid gap-4 text-xs sm:grid-cols-3">
+          <h2 className="mb-4 text-sm font-semibold text-slate-200">Stats</h2>
+
+          {/* Top row: big numbers */}
+          <div className="grid gap-4 sm:grid-cols-4">
             <div>
-              <p className="text-slate-400">Total trades</p>
-              <p className="text-lg font-semibold">{stats.total}</p>
+              <p className="text-xs text-slate-400">Total trades</p>
+              <p className="text-xl font-semibold text-slate-100">
+                {stats.total}
+              </p>
             </div>
+
             <div>
-              <p className="text-slate-400">Win rate</p>
-              <p className="text-lg font-semibold">
+              <p className="text-xs text-slate-400">Win rate</p>
+              <p className="text-xl font-semibold text-slate-100">
                 {stats.winRate.toFixed(1)}%
               </p>
             </div>
+
             <div>
-              <p className="text-slate-400">Average R</p>
-              <p className="text-lg font-semibold">{stats.avgR.toFixed(2)}R</p>
+              <p className="text-xs text-slate-400">Average R</p>
+              <p className="text-xl font-semibold text-slate-100">
+                {stats.avgR.toFixed(2)}R
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">Total R</p>
+              <p className="text-xl font-semibold text-slate-100">
+                {stats.totalR.toFixed(2)}R
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom row: segmented stats */}
+          <div className="mt-6 grid gap-4 text-xs sm:grid-cols-3">
+            {/* Macro alignment card */}
+            <div className="rounded-lg bg-slate-950/60 p-3">
+              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
+                Macro alignment
+              </p>
+              <p className="text-[11px] text-slate-400">
+                With macro: {macroStats.withCount} trades, avg{" "}
+                {macroStats.avgWith.toFixed(2)}R
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Against macro: {macroStats.againstCount} trades, avg{" "}
+                {macroStats.avgAgainst.toFixed(2)}R
+              </p>
+            </div>
+
+            {/* Plan discipline card */}
+            <div className="rounded-lg bg-slate-950/60 p-3">
+              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
+                Plan discipline
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Plan = YES: {planStats.yesCount} trades, avg{" "}
+                {planStats.avgYes.toFixed(2)}R
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Plan = NO: {planStats.noCount} trades, avg{" "}
+                {planStats.avgNo.toFixed(2)}R
+              </p>
+            </div>
+
+            {/* Risk card */}
+            <div className="rounded-lg bg-slate-950/60 p-3">
+              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
+                Risk per trade
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Average risk: {riskStats.avgRisk.toFixed(2)}%
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Max risk: {riskStats.maxRisk.toFixed(2)}%
+              </p>
             </div>
           </div>
         </section>
@@ -525,6 +655,7 @@ export default function JournalPage() {
                   </th>
                   <th className="px-3 py-2 text-left text-slate-400">Dir</th>
                   <th className="px-3 py-2 text-right text-slate-400">R</th>
+                  <th className="px-3 py-2 text-left text-slate-400">Setup</th>
                   <th className="px-3 py-2 text-left text-slate-400">Macro</th>
                   <th className="px-3 py-2 text-left text-slate-400">Plan</th>
                   <th className="px-3 py-2 text-left text-slate-400">
@@ -574,8 +705,19 @@ export default function JournalPage() {
                     </td>
 
                     {/* Macro alignment */}
-                    <td className="px-3 py-2 text-slate-200">
-                      {t.macroAlignment}
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold " +
+                          (t.macroAlignment === "With"
+                            ? "bg-emerald-900/60 text-emerald-300"
+                            : t.macroAlignment === "Against"
+                            ? "bg-amber-900/60 text-amber-300"
+                            : "bg-slate-800 text-slate-300")
+                        }
+                      >
+                        {t.macroAlignment}
+                      </span>
                     </td>
 
                     {/* Followed plan badge */}
