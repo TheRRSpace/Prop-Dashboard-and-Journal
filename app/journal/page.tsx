@@ -187,6 +187,27 @@ export default function JournalPage() {
     return { avgRisk, maxRisk };
   }, [filteredTrades]);
 
+  const equityData = useMemo(() => {
+    if (filteredTrades.length === 0) return [];
+
+    // sort by date string (YYYY-MM-DD) from oldest to newest
+    const sorted = [...filteredTrades].sort((a, b) => {
+      const ad = new Date(a.date).getTime();
+      const bd = new Date(b.date).getTime();
+      return ad - bd;
+    });
+
+    let cumR = 0;
+
+    return sorted.map((t) => {
+      cumR += t.resultR;
+      return {
+        date: t.date, // x-axis label
+        cumR, // cumulative R
+      };
+    });
+  }, [filteredTrades]);
+
   function startEdit(trade: Trade) {
     setEditingId(trade.id);
     setForm({
@@ -581,6 +602,56 @@ export default function JournalPage() {
               </p>
             </div>
           </div>
+        </section>
+
+        <section className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-200">
+            Equity curve (R)
+          </h2>
+
+          {equityData.length === 0 ? (
+            <p className="text-xs text-slate-500">
+              No trades to display yet. Add some trades to see your R curve.
+            </p>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={equityData}
+                  margin={{ top: 10, right: 20, bottom: 0, left: -20 }}
+                >
+                  <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    tickMargin={6}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    tickMargin={6}
+                    width={40}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#020617",
+                      border: "1px solid #1f2937",
+                      borderRadius: "0.5rem",
+                      fontSize: "11px",
+                      color: "#e5e7eb",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumR"
+                    stroke="#34d399"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </section>
 
         {/* Trades list */}
