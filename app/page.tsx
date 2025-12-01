@@ -292,11 +292,29 @@ export default function Home() {
       fees: -vals.fees,
     }));
 
-  const pnlHistory = monthlyPerf.reduce((acc, row) => {
-    const last = acc.length ? acc[acc.length - 1].pnl : 0;
-    acc.push({ date: row.month, pnl: last + (row.payouts + row.fees) });
-    return acc;
-  }, [] as { date: string; pnl: number }[]);
+  const pnlHistory = events
+    .slice() // copy so we don't mutate the original array
+    .sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() // oldest → newest
+    )
+    .reduce((acc, ev) => {
+      const last = acc.length ? acc[acc.length - 1].pnl : 0;
+
+      // payouts add to PnL, fees & purchases subtract
+      let delta = 0;
+      if (ev.type === "payout") {
+        delta = ev.amount;
+      } else if (ev.type === "fee" || ev.type === "purchase") {
+        delta = -ev.amount;
+      }
+
+      acc.push({
+        date: ev.date, // "2025-11-28" etc, same as data
+        pnl: last + delta, // cumulative PnL after this event
+      });
+
+      return acc;
+    }, [] as { date: string; pnl: number }[]);
 
   /* ----- ACCOUNT SIZE DONUT (PURCHASED EVALUATIONS) ----- */
 
