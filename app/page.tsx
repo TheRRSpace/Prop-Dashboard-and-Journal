@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, ChangeEvent } from "react";
-import Papa from "papaparse";
+import Papa, { ParseResult } from "papaparse";
 
 import {
   LineChart,
@@ -113,38 +113,11 @@ export default function Home() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: (results: ParseResult<any>) => {
         const rows = results.data as any[];
-
-        const parsed = rows
-          .map((row) => {
-            const date = String(row.date || "").trim();
-            const propFirm = String(row.propFirm || "").trim();
-            const typeRaw = String(row.type || "")
-              .trim()
-              .toLowerCase();
-            const amount = Number(row.amount);
-
-            if (!date || !propFirm || !typeRaw || isNaN(amount)) {
-              return null;
-            }
-
-            const type =
-              typeRaw === "payout" || typeRaw === "fee" ? typeRaw : null;
-            if (!type) return null;
-
-            return { date, propFirm, type, amount };
-          })
-          .filter(Boolean) as any[];
-
-        if (parsed.length === 0) {
-          console.warn("CSV parsed but no valid rows found");
-          return;
-        }
-
-        setRawEvents(parsed);
+        // your mapping logic
       },
-      error: (error) => {
+      error: (error: unknown) => {
         console.error("Error parsing CSV", error);
       },
     });
