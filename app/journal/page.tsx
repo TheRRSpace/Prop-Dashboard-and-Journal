@@ -70,12 +70,6 @@ export default function JournalPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // filters for table and stats
-  const [instrumentFilter, setInstrumentFilter] = useState("ALL");
-  const [resultFilter, setResultFilter] = useState("ALL");
-  const [macroFilter, setMacroFilter] = useState("ALL");
-  const [planFilter, setPlanFilter] = useState("ALL");
-
   useEffect(() => {
     setTrades(loadTrades());
   }, []);
@@ -85,29 +79,70 @@ export default function JournalPage() {
   }, [trades]);
 
   // trades after applying filters
+  // filters
+  const [instrumentFilter, setInstrumentFilter] = useState("ALL");
+  const [resultFilter, setResultFilter] = useState("ALL");
+  const [macroFilter, setMacroFilter] = useState("ALL");
+  const [planFilter, setPlanFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState("ALL"); // ← you added this
+
   const filteredTrades = useMemo(() => {
-    return trades.filter((t) => {
-      // Instrument filter
+    let cutoff: number | null = null;
+    const now = new Date();
+
+    if (dateFilter === "7D") {
+      cutoff = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    } else if (dateFilter === "30D") {
+      cutoff = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    } else if (dateFilter === "90D") {
+      cutoff = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+    }
+
+    const filtered = trades.filter((t) => {
+      // date filter
+      if (cutoff !== null) {
+        const tradeTime = new Date(t.date).getTime();
+        if (tradeTime < cutoff) return false;
+      }
+
+      // instrument filter
       if (instrumentFilter !== "ALL" && t.instrument !== instrumentFilter) {
         return false;
       }
 
-      // Result filter
+      // result filter
       if (resultFilter === "WINS" && t.resultR <= 0) return false;
       if (resultFilter === "LOSSES" && t.resultR >= 0) return false;
 
-      // Macro filter
+      // macro filter
       if (macroFilter !== "ALL" && t.macroAlignment !== macroFilter) {
         return false;
       }
 
-      // Plan filter
+      // plan filter
       if (planFilter === "YES" && !t.followedPlan) return false;
       if (planFilter === "NO" && t.followedPlan) return false;
 
       return true;
     });
-  }, [trades, instrumentFilter, resultFilter, macroFilter, planFilter]);
+
+    // sort by entry date, newest first
+    filtered.sort((a, b) => {
+      const ad = new Date(a.date).getTime();
+      const bd = new Date(b.date).getTime();
+      return bd - ad; // use ad - bd if you ever want oldest first
+    });
+
+    return filtered;
+  }, [
+    trades,
+    dateFilter,
+    instrumentFilter,
+    resultFilter,
+    macroFilter,
+    planFilter,
+  ]);
+  // ⬆⬆ BLOCK ENDS HERE
 
   const stats = useMemo(() => {
     if (filteredTrades.length === 0) {
@@ -658,6 +693,21 @@ export default function JournalPage() {
         <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">Trades</h2>
           <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-slate-300">
+            {/* Date filter */}
+            <label className="flex items-center gap-1">
+              <span>Date:</span>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+              >
+                <option value="ALL">All time</option>
+                <option value="7D">Last 7 days</option>
+                <option value="30D">Last 30 days</option>
+                <option value="90D">Last 90 days</option>
+              </select>
+            </label>
+
             {/* Instrument filter */}
             <label className="flex items-center gap-1">
               <span>Instrument:</span>
