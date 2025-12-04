@@ -118,7 +118,7 @@ export default function Home() {
       skipEmptyLines: true,
       complete: (results: ParseResult<any>) => {
         const rows = results.data as any[];
-        // TODO: map CSV rows into your event shape when you feel like suffering
+        // TODO: map CSV rows into your event shape
         console.log("Parsed CSV rows", rows);
       },
       error: (error: unknown) => {
@@ -292,7 +292,7 @@ export default function Home() {
       return acc;
     }, [] as { date: string; pnl: number }[]);
 
-  /* ----- ACCOUNT SIZE DONUT (PURCHASED EVALUATIONS) ----- */
+  /* ----- ACCOUNT SIZE DISTRIBUTION (PURCHASED EVALUATIONS) ----- */
 
   const purchasedAccounts = filteredAccounts.filter(
     (a: any) => a.type === "evaluation"
@@ -313,6 +313,27 @@ export default function Home() {
       percentage: totalAccounts === 0 ? 0 : (count / totalAccounts) * 100,
     })
   );
+
+  const totalEvalCapital = purchasedAccounts.reduce(
+    (acc: number, a: any) => acc + a.size,
+    0
+  );
+  const avgEvalSize =
+    totalAccounts === 0 ? 0 : totalEvalCapital / totalAccounts;
+  const distinctEvalProps = new Set(
+    purchasedAccounts.map((a: any) => a.propFirm)
+  ).size;
+
+  let dominantBucketLabel = "";
+  let dominantBucketShare = 0;
+  if (accountSizeDonut.length > 0) {
+    const topBucket = accountSizeDonut.reduce(
+      (max, cur) => (cur.count > max.count ? cur : max),
+      accountSizeDonut[0]
+    );
+    dominantBucketLabel = topBucket.name;
+    dominantBucketShare = topBucket.percentage;
+  }
 
   /* ----- ACTIVE CHALLENGES DONUT DATA ----- */
 
@@ -617,47 +638,123 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Account sizes donut */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
-            <h2 className="mb-1 text-sm font-semibold text-slate-300">
-              Account sizes (evaluations)
-            </h2>
-            <p className="mb-3 text-[11px] text-slate-400">
-              Total accounts purchased: {totalAccounts}
-            </p>
+          {/* Account sizes card - upgraded */}
+          <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-300">
+                  Account sizes (evaluations)
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Distribution of all purchased evaluation accounts by nominal
+                  size.
+                </p>
+              </div>
 
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={accountSizeDonut}
-                    dataKey="count"
-                    nameKey="name"
-                    outerRadius={90}
-                    labelLine={false}
-                    label={(entry: any) => `${entry.count}`}
-                  >
-                    {accountSizeDonut.map((entry, index) => (
-                      <Cell
-                        key={entry.name}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<AccountSizeTooltip />} />
-                  <Legend
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                    formatter={(value, entry: any) => {
-                      const item = entry.payload;
-                      return `${item.name} (${
-                        item.count
-                      }, ${item.percentage.toFixed(0)}%)`;
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-right text-[11px]">
+                <div className="text-slate-400">Total accounts</div>
+                <div className="font-semibold text-slate-100">
+                  {totalAccounts}
+                </div>
+
+                <div className="text-slate-400">Total capital</div>
+                <div className="font-semibold text-slate-100">
+                  {formatValue(totalEvalCapital, "currency")}
+                </div>
+
+                <div className="text-slate-400">Average size</div>
+                <div className="font-semibold text-slate-100">
+                  {formatValue(avgEvalSize, "currency")}
+                </div>
+
+                <div className="text-slate-400">Props used</div>
+                <div className="font-semibold text-slate-100">
+                  {distinctEvalProps}
+                </div>
+              </div>
+            </div>
+
+            {dominantBucketLabel && (
+              <p className="text-[11px] text-slate-500">
+                Most common bucket:{" "}
+                <span className="font-semibold text-slate-200">
+                  {dominantBucketLabel}
+                </span>{" "}
+                (
+                <span className="text-slate-200">
+                  {dominantBucketShare.toFixed(0)}%
+                </span>{" "}
+                of evaluation accounts).
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
+              {/* Donut */}
+              <div className="relative h-56 w-56 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={accountSizeDonut}
+                      dataKey="count"
+                      nameKey="name"
+                      innerRadius="60%"
+                      outerRadius="80%"
+                      paddingAngle={4}
+                    >
+                      {accountSizeDonut.map((entry, index) => (
+                        <Cell
+                          key={entry.name}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<AccountSizeTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                    Total
+                  </p>
+                  <p className="text-2xl font-semibold text-slate-50">
+                    {totalAccounts}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    evaluation accounts
+                  </p>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="w-full max-w-xs space-y-2 text-[11px]">
+                {accountSizeDonut.length === 0 ? (
+                  <p className="text-slate-500">
+                    No evaluation accounts found for this filter.
+                  </p>
+                ) : (
+                  accountSizeDonut.map((bucket, idx) => (
+                    <div
+                      key={bucket.name}
+                      className="flex items-center justify-between rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{
+                            backgroundColor: COLORS[idx % COLORS.length],
+                          }}
+                        />
+                        <span className="text-slate-100">{bucket.name}</span>
+                      </span>
+
+                      <span className="flex gap-3 text-slate-400">
+                        <span>{bucket.count} accs</span>
+                        <span>{bucket.percentage.toFixed(0)}%</span>
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
         </section>
