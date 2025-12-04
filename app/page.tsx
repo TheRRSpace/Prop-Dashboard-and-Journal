@@ -5,7 +5,6 @@ import Papa, { ParseResult } from "papaparse";
 
 import {
   LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -17,6 +16,7 @@ import {
   BarChart,
   Bar,
   Legend,
+  Area,
 } from "recharts";
 
 import { events as initialEvents } from "./data/propData";
@@ -59,6 +59,12 @@ function monthLabel(monthKey: string) {
 
 const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#6b7280"];
 
+// main dashboard card chrome
+const CARD_CLASS =
+  "relative overflow-hidden rounded-3xl border border-jr-border " +
+  "bg-gradient-to-b from-[#050816]/90 via-[#020617]/95 to-[#020617] " +
+  "px-5 py-4 shadow-[0_24px_60px_rgba(15,23,42,0.95)] backdrop-blur-xl";
+
 function formatValue(
   value: number,
   format: "currency" | "int" | "percent"
@@ -87,7 +93,7 @@ function AccountSizeTooltip({
   const { name, count, percentage } = payload[0].payload;
 
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100">
+    <div className="rounded-md border border-jr-border bg-jr-surface px-3 py-2 text-xs text-jr-text">
       <div className="font-semibold">{name}</div>
       <div>
         {count} account{count !== 1 ? "s" : ""}
@@ -115,7 +121,9 @@ export default function Home() {
       skipEmptyLines: true,
       complete: (results: ParseResult<any>) => {
         const rows = results.data as any[];
-        // your mapping logic
+        // TODO: map your CSV rows into your event shape if you actually want to use this
+        console.log("Parsed CSV rows", rows);
+        // setRawEvents(mappedRows);
       },
       error: (error: unknown) => {
         console.error("Error parsing CSV", error);
@@ -216,31 +224,31 @@ export default function Home() {
     format: "currency" | "int" | "percent";
   }[] = [
     {
-      label: "Current Funded Amount",
+      label: "Current funded amount",
       value: fundedAmount,
       format: "currency",
     },
     {
-      label: "All-Time Total Payouts",
+      label: "All-time payouts",
       value: totalPayouts,
       format: "currency",
     },
     {
-      label: "Money Spent on Challenge Fees",
+      label: "Challenge fees paid",
       value: -totalFees,
       format: "currency",
     },
-    { label: "Current PnL ($)", value: currentPnl, format: "currency" },
+    { label: "Current PnL", value: currentPnl, format: "currency" },
 
-    { label: "Total Evaluations", value: totalEvaluations, format: "int" },
-    { label: "Active Evaluations", value: activeEvaluations, format: "int" },
-    { label: "Active Funded Accs", value: activeFundedAccs, format: "int" },
-    { label: "Failed Challenges", value: failedChallenges, format: "int" },
+    { label: "Total evaluations", value: totalEvaluations, format: "int" },
+    { label: "Active evaluations", value: activeEvaluations, format: "int" },
+    { label: "Active funded accounts", value: activeFundedAccs, format: "int" },
+    { label: "Failed challenges", value: failedChallenges, format: "int" },
 
-    { label: "Phase 1 Pass Rate", value: phase1PassRate, format: "percent" },
-    { label: "Phase 2 Pass Rate", value: phase2PassRate, format: "percent" },
-    { label: "Reached Funded %", value: fundedRate, format: "percent" },
-    { label: "Reached Payout %", value: payoutRate, format: "percent" },
+    { label: "Phase 1 pass rate", value: phase1PassRate, format: "percent" },
+    { label: "Phase 2 pass rate", value: phase2PassRate, format: "percent" },
+    { label: "Reached funded %", value: fundedRate, format: "percent" },
+    { label: "Reached payout %", value: payoutRate, format: "percent" },
   ];
 
   /* ----- MONTHLY PERFORMANCE (EVENTS) ----- */
@@ -265,15 +273,16 @@ export default function Home() {
       fees: -vals.fees,
     }));
 
+  /* ----- DAILY PNL HISTORY (CUMULATIVE) ----- */
+
   const pnlHistory = events
-    .slice() // copy so we don't mutate the original array
+    .slice()
     .sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() // oldest → newest
     )
     .reduce((acc, ev) => {
       const last = acc.length ? acc[acc.length - 1].pnl : 0;
 
-      // payouts add to PnL, fees & purchases subtract
       let delta = 0;
       if (ev.type === "payout") {
         delta = ev.amount;
@@ -282,8 +291,8 @@ export default function Home() {
       }
 
       acc.push({
-        date: ev.date, // "2025-11-28" etc, same as data
-        pnl: last + delta, // cumulative PnL after this event
+        date: ev.date,
+        pnl: last + delta,
       });
 
       return acc;
@@ -291,7 +300,6 @@ export default function Home() {
 
   /* ----- ACCOUNT SIZE DONUT (PURCHASED EVALUATIONS) ----- */
 
-  // "Purchased" = evaluations
   const purchasedAccounts = filteredAccounts.filter(
     (a: any) => a.type === "evaluation"
   );
@@ -329,28 +337,34 @@ export default function Home() {
   /* ---------- JSX ---------- */
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
+    <main className="relative min-h-screen bg-jr-bg text-jr-text">
+      {/* background glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10
+          bg-[#020617]
+          bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.35),transparent_60%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.18),transparent_55%)]"
+      />
+
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6">
+        {/* HEADER */}
+        <header className="mb-1 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-[22px] font-semibold tracking-tight text-jr-text">
               Prop Firm Performance
             </h1>
-            <p className="text-sm text-slate-400">
-              KPIs and charts filtered by prop firm. Events can be loaded from a
-              CSV.
+            <p className="mt-1 text-[11px] text-jr-muted">
+              Track challenges, payouts and fees across all your prop firms.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 text-[11px]">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">
-                Filter by prop firm:
-              </span>
+              <span className="text-jr-muted">Firm:</span>
               <select
                 value={selectedFirm}
                 onChange={(e) => setSelectedFirm(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="rounded-full border border-jr-border bg-jr-surface px-3 py-1 text-[11px] text-jr-text outline-none ring-0 focus:border-jr-primary"
               >
                 <option value="All">All</option>
                 {firms.map((firm) => (
@@ -362,75 +376,107 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Load events CSV:</span>
+              <span className="text-jr-muted">Load events CSV:</span>
               <input
                 type="file"
                 accept=".csv,text/csv"
                 onChange={handleEventsCsvChange}
-                className="text-xs text-slate-300 file:mr-2 file:rounded-md file:border file:border-slate-700 file:bg-slate-900 file:px-2 file:py-1 file:text-xs file:text-slate-100 hover:file:border-sky-500"
+                className="text-[11px] text-jr-muted file:mr-2 file:rounded-full file:border file:border-jr-border file:bg-jr-surface file:px-3 file:py-1 file:text-[11px] file:text-jr-text hover:file:border-jr-primary"
               />
             </div>
           </div>
         </header>
 
-        {/* KPI cards */}
+        {/* KPI CARDS */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi) => (
-            <div
-              key={kpi.label}
-              className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-md"
-            >
-              <p className="text-xs uppercase tracking-wide text-slate-400">
+            <div key={kpi.label} className={CARD_CLASS}>
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-jr-muted">
                 {kpi.label}
               </p>
-              <p className="mt-2 text-xl font-semibold">
+              <p className="mt-2 text-[18px] font-semibold text-jr-text">
                 {formatValue(kpi.value, kpi.format)}
               </p>
             </div>
           ))}
         </section>
 
-        {/* Main charts */}
+        {/* MAIN CHARTS */}
         <section className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold text-slate-300">
-              Current PnL in USD (Payouts minus Challenge Fees)
-            </h2>
-            <div className="h-64">
+          {/* PnL chart */}
+          <div
+            className={`${CARD_CLASS} lg:col-span-2 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_60%)]`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold text-jr-text">
+                Current PnL in USD
+              </h2>
+              <span className="text-[11px] text-jr-muted">
+                Payouts minus challenge fees
+              </span>
+            </div>
+
+            <div className="mt-3 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={pnlHistory}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2933" />
-                  <XAxis dataKey="date" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
+                  <defs>
+                    <linearGradient id="pnlArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="0%"
+                        stopColor="#38bdf8"
+                        stopOpacity={0.45}
+                      />
+                      <stop offset="100%" stopColor="#38bdf8" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+
+                  <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    width={60}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#020617",
-                      border: "1px solid #1e293b",
-                      borderRadius: "0.5rem",
+                      border: "1px solid #1f2937",
+                      borderRadius: 12,
+                      fontSize: 11,
                       color: "#e5e7eb",
                     }}
                   />
-                  <Line
+
+                  <Area
                     type="monotone"
                     dataKey="pnl"
                     stroke="#38bdf8"
-                    strokeWidth={2}
+                    strokeWidth={2.6}
+                    fill="url(#pnlArea)"
                     dot={false}
+                    activeDot={{ r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <h2 className="mb-1 text-sm font-semibold text-slate-300">
-              Account Sizes (Evaluations)
-            </h2>
-            <p className="mb-3 text-xs text-slate-400">
-              Total accounts purchased: {totalAccounts}
-            </p>
+          {/* Account size donut */}
+          <div className={CARD_CLASS}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold text-jr-text">
+                Account sizes (evaluations)
+              </h2>
+              <span className="text-[11px] text-jr-muted">
+                {totalAccounts} total
+              </span>
+            </div>
 
-            <div className="h-64">
+            <div className="mt-3 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -453,6 +499,7 @@ export default function Home() {
                     layout="horizontal"
                     verticalAlign="bottom"
                     align="center"
+                    wrapperStyle={{ fontSize: 11, color: "#9ca3af" }}
                     formatter={(value, entry: any) => {
                       const item = entry.payload;
                       return `${item.name} (${
@@ -466,11 +513,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Bottom charts */}
+        {/* BOTTOM CHARTS */}
         <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <h2 className="mb-4 text-sm font-semibold text-slate-300">
-              Payouts by Prop Firm
+          {/* Payouts by firm */}
+          <div className={CARD_CLASS}>
+            <h2 className="mb-3 text-xs font-semibold text-jr-text">
+              Payouts by prop firm
             </h2>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -479,56 +527,85 @@ export default function Home() {
                   layout="vertical"
                   margin={{ left: 80 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2933" />
-                  <XAxis type="number" stroke="#94a3b8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
+                  <XAxis
+                    type="number"
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                  />
                   <YAxis
                     dataKey="firm"
                     type="category"
-                    stroke="#94a3b8"
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
                     width={160}
                   />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#020617",
-                      border: "1px solid #1e293b",
-                      borderRadius: "0.5rem",
+                      border: "1px solid #1f2937",
+                      borderRadius: 12,
+                      fontSize: 11,
                       color: "#e5e7eb",
                     }}
                   />
-                  <Bar dataKey="payouts" fill="#22c55e" />
+                  <Bar dataKey="payouts" fill="#22c55e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <h2 className="mb-4 text-sm font-semibold text-slate-300">
-              Monthly Payouts vs Challenge Fees
+          {/* Monthly payouts vs fees */}
+          <div className={CARD_CLASS}>
+            <h2 className="mb-3 text-xs font-semibold text-jr-text">
+              Monthly payouts vs challenge fees
             </h2>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyPerf}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2933" />
-                  <XAxis dataKey="month" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#020617",
-                      border: "1px solid #1e293b",
-                      borderRadius: "0.5rem",
+                      border: "1px solid #1f2937",
+                      borderRadius: 12,
+                      fontSize: 11,
                       color: "#e5e7eb",
                     }}
                   />
-                  <Legend />
-                  <Bar dataKey="payouts" name="Payouts" fill="#3b82f6" />
-                  <Bar dataKey="fees" name="Challenge Fees" fill="#ef4444" />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "#9ca3af" }} />
+                  <Bar
+                    dataKey="payouts"
+                    name="Payouts"
+                    fill="#3b82f6"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="fees"
+                    name="Challenge fees"
+                    fill="#ef4444"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </section>
 
-        <section>
+        {/* EVENTS TABLE */}
+        <section className={CARD_CLASS}>
+          <h2 className="mb-3 text-xs font-semibold text-jr-text">
+            Events (payouts & fees)
+          </h2>
           <EventsTable events={events as any} />
         </section>
       </div>

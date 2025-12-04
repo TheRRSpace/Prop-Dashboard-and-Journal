@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -32,6 +33,11 @@ type Trade = {
 const STORAGE_KEY = "journal_trades_v1";
 const SESSIONS = ["Asia", "London", "NY", "London/NY overlap"];
 const INSTRUMENTS = ["XAUUSD", "EURUSD"];
+
+const CARD_CLASS =
+  "relative overflow-hidden rounded-3xl border border-jr-border " +
+  "bg-gradient-to-b from-[#050816]/90 via-[#020617]/95 to-[#020617] " +
+  "px-5 py-4 shadow-[0_24px_60px_rgba(15,23,42,0.95)] backdrop-blur-xl";
 
 function loadTrades(): Trade[] {
   if (typeof window === "undefined") return [];
@@ -78,14 +84,14 @@ export default function JournalPage() {
     saveTrades(trades);
   }, [trades]);
 
-  // trades after applying filters
   // filters
   const [instrumentFilter, setInstrumentFilter] = useState("ALL");
   const [resultFilter, setResultFilter] = useState("ALL");
   const [macroFilter, setMacroFilter] = useState("ALL");
   const [planFilter, setPlanFilter] = useState("ALL");
-  const [dateFilter, setDateFilter] = useState("ALL"); // ← you added this
+  const [dateFilter, setDateFilter] = useState("ALL");
 
+  // filtered trades
   const filteredTrades = useMemo(() => {
     let cutoff: number | null = null;
     const now = new Date();
@@ -126,11 +132,11 @@ export default function JournalPage() {
       return true;
     });
 
-    // sort by entry date, newest first
+    // newest first
     filtered.sort((a, b) => {
       const ad = new Date(a.date).getTime();
       const bd = new Date(b.date).getTime();
-      return bd - ad; // use ad - bd if you ever want oldest first
+      return bd - ad;
     });
 
     return filtered;
@@ -142,7 +148,6 @@ export default function JournalPage() {
     macroFilter,
     planFilter,
   ]);
-  // ⬆⬆ BLOCK ENDS HERE
 
   const stats = useMemo(() => {
     if (filteredTrades.length === 0) {
@@ -225,7 +230,7 @@ export default function JournalPage() {
   const equityData = useMemo(() => {
     if (filteredTrades.length === 0) return [];
 
-    // sort by date string (YYYY-MM-DD) from oldest to newest
+    // oldest to newest
     const sorted = [...filteredTrades].sort((a, b) => {
       const ad = new Date(a.date).getTime();
       const bd = new Date(b.date).getTime();
@@ -237,8 +242,8 @@ export default function JournalPage() {
     return sorted.map((t) => {
       cumR += t.resultR;
       return {
-        date: t.date, // x-axis label
-        cumR, // cumulative R
+        date: t.date,
+        cumR,
       };
     });
   }, [filteredTrades]);
@@ -259,12 +264,12 @@ export default function JournalPage() {
       emotionNote: trade.emotionNote,
     });
   }
+
   function deleteTrade(id: string) {
     const confirmDelete = window.confirm("Delete this trade?");
     if (!confirmDelete) return;
 
     setEditingId((current) => (current === id ? null : current));
-
     setTrades((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -286,7 +291,6 @@ export default function JournalPage() {
     };
 
     if (editingId) {
-      // update existing
       setTrades((prev) =>
         prev.map((t) =>
           t.id === editingId
@@ -298,7 +302,6 @@ export default function JournalPage() {
         )
       );
     } else {
-      // create new
       const newTrade: Trade = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
@@ -307,7 +310,6 @@ export default function JournalPage() {
       setTrades((prev) => [newTrade, ...prev]);
     }
 
-    // reset form state and exit edit mode
     setEditingId(null);
     setForm((prev) => ({
       ...prev,
@@ -318,32 +320,44 @@ export default function JournalPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
+    <main className="relative min-h-screen bg-jr-bg text-jr-text">
+      {/* background glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[#020617]
+        bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.35),transparent_60%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.18),transparent_55%)]"
+      />
+
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6">
+        {/* HEADER */}
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Trading Journal
+          <h1 className="text-[22px] font-semibold tracking-tight text-jr-text">
+            Trading journal
           </h1>
-          <p className="text-sm text-slate-400">
-            Log trades quickly and see how they perform over time.
+          <p className="mt-1 text-[11px] text-jr-muted">
+            Log trades fast, track R, and check if you are actually respecting
+            the macro story.
           </p>
         </header>
 
-        {/* Add trade form */}
-        <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h2 className="mb-1 text-sm font-semibold text-slate-200">
+        {/* ADD TRADE FORM */}
+        <section className={CARD_CLASS}>
+          <h2 className="mb-1 text-xs font-semibold text-jr-text">
             {editingId ? "Edit trade" : "Add trade"}
           </h2>
           {editingId && (
-            <p className="mb-3 text-[11px] text-amber-400">
+            <p className="mb-3 text-[11px] text-jr-warning">
               Editing existing entry. Submit to save changes or refresh to
               cancel.
             </p>
           )}
 
-          <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="block text-xs text-slate-400">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-2 grid gap-4 md:grid-cols-2"
+          >
+            <div className="space-y-2 text-[11px]">
+              <label className="block text-jr-muted">
                 Date
                 <input
                   type="date"
@@ -351,18 +365,18 @@ export default function JournalPage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, date: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 />
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Instrument
                 <select
                   value={form.instrument}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, instrument: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 >
                   {INSTRUMENTS.map((inst) => (
                     <option key={inst} value={inst}>
@@ -372,7 +386,7 @@ export default function JournalPage() {
                 </select>
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Direction
                 <div className="mt-1 flex gap-2">
                   {(["LONG", "SHORT"] as const).map((dir) => (
@@ -381,10 +395,10 @@ export default function JournalPage() {
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, direction: dir }))}
                       className={
-                        "flex-1 rounded-md border px-2 py-1 text-xs " +
+                        "flex-1 rounded-md border px-2 py-1 " +
                         (form.direction === dir
-                          ? "border-emerald-500 bg-emerald-900/40"
-                          : "border-slate-700 bg-slate-950")
+                          ? "border-jr-primary bg-jr-primary/20 text-jr-text"
+                          : "border-jr-border bg-jr-surface text-jr-muted")
                       }
                     >
                       {dir}
@@ -393,14 +407,14 @@ export default function JournalPage() {
                 </div>
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Session
                 <select
                   value={form.session}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, session: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 >
                   {SESSIONS.map((s) => (
                     <option key={s} value={s}>
@@ -410,7 +424,7 @@ export default function JournalPage() {
                 </select>
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Setup
                 <input
                   type="text"
@@ -418,14 +432,14 @@ export default function JournalPage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, setup: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                   placeholder="liq grab + BOS"
                 />
               </label>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-xs text-slate-400">
+            <div className="space-y-2 text-[11px]">
+              <label className="block text-jr-muted">
                 Macro alignment
                 <select
                   value={form.macroAlignment}
@@ -438,7 +452,7 @@ export default function JournalPage() {
                         | "Neutral",
                     }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 >
                   <option value="With">With</option>
                   <option value="Against">Against</option>
@@ -446,7 +460,7 @@ export default function JournalPage() {
                 </select>
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Risk % of account
                 <input
                   type="number"
@@ -458,11 +472,11 @@ export default function JournalPage() {
                       riskPercent: Number(e.target.value),
                     }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 />
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Planned R:R
                 <input
                   type="number"
@@ -474,11 +488,11 @@ export default function JournalPage() {
                       plannedRR: Number(e.target.value),
                     }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                 />
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Result (R)
                 <input
                   type="number"
@@ -490,13 +504,13 @@ export default function JournalPage() {
                       resultR: Number(e.target.value),
                     }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                   placeholder="+2, -1"
                 />
               </label>
 
-              <label className="block text-xs text-slate-400">
-                Followed plan?
+              <label className="block text-jr-muted">
+                Followed plan
                 <div className="mt-1 flex gap-2">
                   <button
                     type="button"
@@ -504,10 +518,10 @@ export default function JournalPage() {
                       setForm((f) => ({ ...f, followedPlan: true }))
                     }
                     className={
-                      "flex-1 rounded-md border px-2 py-1 text-xs " +
+                      "flex-1 rounded-md border px-2 py-1 " +
                       (form.followedPlan
-                        ? "border-emerald-500 bg-emerald-900/40"
-                        : "border-slate-700 bg-slate-950")
+                        ? "border-jr-primary bg-jr-primary/20 text-jr-text"
+                        : "border-jr-border bg-jr-surface text-jr-muted")
                     }
                   >
                     Yes
@@ -518,10 +532,10 @@ export default function JournalPage() {
                       setForm((f) => ({ ...f, followedPlan: false }))
                     }
                     className={
-                      "flex-1 rounded-md border px-2 py-1 text-xs " +
+                      "flex-1 rounded-md border px-2 py-1 " +
                       (!form.followedPlan
-                        ? "border-red-500 bg-red-900/40"
-                        : "border-slate-700 bg-slate-950")
+                        ? "border-jr-loss bg-jr-loss/20 text-jr-text"
+                        : "border-jr-border bg-jr-surface text-jr-muted")
                     }
                   >
                     No
@@ -529,7 +543,7 @@ export default function JournalPage() {
                 </div>
               </label>
 
-              <label className="block text-xs text-slate-400">
+              <label className="block text-jr-muted">
                 Emotion / note
                 <input
                   type="text"
@@ -540,7 +554,7 @@ export default function JournalPage() {
                       emotionNote: e.target.value,
                     }))
                   }
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs"
+                  className="mt-1 w-full rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
                   placeholder="chased, calm, revenge..."
                 />
               </label>
@@ -548,7 +562,7 @@ export default function JournalPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                  className="w-full rounded-full bg-jr-primary px-3 py-1.5 text-[11px] font-semibold text-white shadow-lg shadow-jr-primary/40 hover:bg-jr-primary-soft"
                 >
                   {editingId ? "Update trade" : "Save trade"}
                 </button>
@@ -557,95 +571,87 @@ export default function JournalPage() {
           </form>
         </section>
 
-        {/* Stats */}
-        <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h2 className="mb-4 text-sm font-semibold text-slate-200">Stats</h2>
+        {/* STATS */}
+        <section className={CARD_CLASS}>
+          <h2 className="mb-4 text-xs font-semibold text-jr-text">Stats</h2>
 
           {/* Top row: big numbers */}
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-4 text-[11px]">
             <div>
-              <p className="text-xs text-slate-400">Total trades</p>
-              <p className="text-xl font-semibold text-slate-100">
+              <p className="text-jr-muted">Total trades</p>
+              <p className="mt-1 text-lg font-semibold text-jr-text">
                 {stats.total}
               </p>
             </div>
 
             <div>
-              <p className="text-xs text-slate-400">Win rate</p>
-              <p className="text-xl font-semibold text-slate-100">
+              <p className="text-jr-muted">Win rate</p>
+              <p className="mt-1 text-lg font-semibold text-jr-text">
                 {stats.winRate.toFixed(1)}%
               </p>
             </div>
 
             <div>
-              <p className="text-xs text-slate-400">Average R</p>
-              <p className="text-xl font-semibold text-slate-100">
+              <p className="text-jr-muted">Average R</p>
+              <p className="mt-1 text-lg font-semibold text-jr-text">
                 {stats.avgR.toFixed(2)}R
               </p>
             </div>
 
             <div>
-              <p className="text-xs text-slate-400">Total R</p>
-              <p className="text-xl font-semibold text-slate-100">
+              <p className="text-jr-muted">Total R</p>
+              <p className="mt-1 text-lg font-semibold text-jr-text">
                 {stats.totalR.toFixed(2)}R
               </p>
             </div>
           </div>
 
-          {/* Bottom row: segmented stats */}
-          <div className="mt-6 grid gap-4 text-xs sm:grid-cols-3">
-            {/* Macro alignment card */}
-            <div className="rounded-lg bg-slate-950/60 p-3">
-              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
-                Macro alignment
-              </p>
-              <p className="text-[11px] text-slate-400">
+          {/* Bottom row */}
+          <div className="mt-6 grid gap-4 text-[11px] sm:grid-cols-3">
+            <div className="rounded-2xl bg-jr-surface/60 p-3">
+              <p className="mb-1 font-semibold text-jr-text">Macro alignment</p>
+              <p className="text-jr-muted">
                 With macro: {macroStats.withCount} trades, avg{" "}
                 {macroStats.avgWith.toFixed(2)}R
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-jr-muted">
                 Against macro: {macroStats.againstCount} trades, avg{" "}
                 {macroStats.avgAgainst.toFixed(2)}R
               </p>
             </div>
 
-            {/* Plan discipline card */}
-            <div className="rounded-lg bg-slate-950/60 p-3">
-              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
-                Plan discipline
-              </p>
-              <p className="text-[11px] text-slate-400">
+            <div className="rounded-2xl bg-jr-surface/60 p-3">
+              <p className="mb-1 font-semibold text-jr-text">Plan discipline</p>
+              <p className="text-jr-muted">
                 Plan = YES: {planStats.yesCount} trades, avg{" "}
                 {planStats.avgYes.toFixed(2)}R
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-jr-muted">
                 Plan = NO: {planStats.noCount} trades, avg{" "}
                 {planStats.avgNo.toFixed(2)}R
               </p>
             </div>
 
-            {/* Risk card */}
-            <div className="rounded-lg bg-slate-950/60 p-3">
-              <p className="mb-1 font-semibold text-slate-200 text-[11px]">
-                Risk per trade
-              </p>
-              <p className="text-[11px] text-slate-400">
+            <div className="rounded-2xl bg-jr-surface/60 p-3">
+              <p className="mb-1 font-semibold text-jr-text">Risk per trade</p>
+              <p className="text-jr-muted">
                 Average risk: {riskStats.avgRisk.toFixed(2)}%
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-jr-muted">
                 Max risk: {riskStats.maxRisk.toFixed(2)}%
               </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-200">
+        {/* EQUITY CURVE */}
+        <section className={CARD_CLASS}>
+          <h2 className="mb-3 text-xs font-semibold text-jr-text">
             Equity curve (R)
           </h2>
 
           {equityData.length === 0 ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-[11px] text-jr-muted">
               No trades to display yet. Add some trades to see your R curve.
             </p>
           ) : (
@@ -655,7 +661,7 @@ export default function JournalPage() {
                   data={equityData}
                   margin={{ top: 10, right: 20, bottom: 0, left: -20 }}
                 >
-                  <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
+                  <CartesianGrid stroke="#111827" strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 10, fill: "#9ca3af" }}
@@ -670,15 +676,15 @@ export default function JournalPage() {
                     contentStyle={{
                       backgroundColor: "#020617",
                       border: "1px solid #1f2937",
-                      borderRadius: "0.5rem",
-                      fontSize: "11px",
+                      borderRadius: 12,
+                      fontSize: 11,
                       color: "#e5e7eb",
                     }}
                   />
                   <Line
                     type="monotone"
                     dataKey="cumR"
-                    stroke="#34d399"
+                    stroke="#22c55e"
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}
@@ -689,17 +695,18 @@ export default function JournalPage() {
           )}
         </section>
 
-        {/* Trades list */}
-        <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-200">Trades</h2>
-          <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-slate-300">
-            {/* Date filter */}
+        {/* TRADES TABLE */}
+        <section className={CARD_CLASS}>
+          <h2 className="mb-3 text-xs font-semibold text-jr-text">Trades</h2>
+
+          {/* filters */}
+          <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-jr-text">
             <label className="flex items-center gap-1">
-              <span>Date:</span>
+              <span className="text-jr-muted">Date:</span>
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+                className="rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
               >
                 <option value="ALL">All time</option>
                 <option value="7D">Last 7 days</option>
@@ -708,13 +715,12 @@ export default function JournalPage() {
               </select>
             </label>
 
-            {/* Instrument filter */}
             <label className="flex items-center gap-1">
-              <span>Instrument:</span>
+              <span className="text-jr-muted">Instrument:</span>
               <select
                 value={instrumentFilter}
                 onChange={(e) => setInstrumentFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+                className="rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
               >
                 <option value="ALL">All</option>
                 <option value="XAUUSD">XAUUSD</option>
@@ -722,13 +728,12 @@ export default function JournalPage() {
               </select>
             </label>
 
-            {/* Result filter */}
             <label className="flex items-center gap-1">
-              <span>Result:</span>
+              <span className="text-jr-muted">Result:</span>
               <select
                 value={resultFilter}
                 onChange={(e) => setResultFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+                className="rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
               >
                 <option value="ALL">All</option>
                 <option value="WINS">Wins</option>
@@ -736,13 +741,12 @@ export default function JournalPage() {
               </select>
             </label>
 
-            {/* Macro filter */}
             <label className="flex items-center gap-1">
-              <span>Macro:</span>
+              <span className="text-jr-muted">Macro:</span>
               <select
                 value={macroFilter}
                 onChange={(e) => setMacroFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+                className="rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
               >
                 <option value="ALL">All</option>
                 <option value="With">With</option>
@@ -751,13 +755,12 @@ export default function JournalPage() {
               </select>
             </label>
 
-            {/* Plan filter */}
             <label className="flex items-center gap-1">
-              <span>Plan:</span>
+              <span className="text-jr-muted">Plan:</span>
               <select
                 value={planFilter}
                 onChange={(e) => setPlanFilter(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1"
+                className="rounded-md border border-jr-border bg-jr-surface px-2 py-1 text-[11px] text-jr-text outline-none focus:border-jr-primary"
               >
                 <option value="ALL">All</option>
                 <option value="YES">Followed</option>
@@ -766,23 +769,35 @@ export default function JournalPage() {
             </label>
           </div>
 
-          <div className="max-h-80 overflow-auto text-xs">
-            <table className="min-w-full border-t border-slate-800">
-              <thead className="sticky top-0 bg-slate-900">
+          <div className="max-h-80 overflow-auto text-[11px]">
+            <table className="min-w-full border-t border-jr-border/60">
+              <thead className="sticky top-0 bg-[#020617]/95 backdrop-blur">
                 <tr>
-                  <th className="px-3 py-2 text-left text-slate-400">Date</th>
-                  <th className="px-3 py-2 text-left text-slate-400">
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
+                    Date
+                  </th>
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
                     Instrument
                   </th>
-                  <th className="px-3 py-2 text-left text-slate-400">Dir</th>
-                  <th className="px-3 py-2 text-right text-slate-400">R</th>
-                  <th className="px-3 py-2 text-left text-slate-400">Setup</th>
-                  <th className="px-3 py-2 text-left text-slate-400">Macro</th>
-                  <th className="px-3 py-2 text-left text-slate-400">Plan</th>
-                  <th className="px-3 py-2 text-left text-slate-400">
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
+                    Dir
+                  </th>
+                  <th className="px-3 py-2 text-right font-normal text-jr-muted">
+                    R
+                  </th>
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
+                    Setup
+                  </th>
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
+                    Macro
+                  </th>
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
+                    Plan
+                  </th>
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
                     Emotion
                   </th>
-                  <th className="px-3 py-2 text-left text-slate-400">
+                  <th className="px-3 py-2 text-left font-normal text-jr-muted">
                     Actions
                   </th>
                 </tr>
@@ -792,83 +807,72 @@ export default function JournalPage() {
                   <tr
                     key={t.id}
                     className={
-                      idx % 2 === 0 ? "bg-slate-950" : "bg-slate-900/70"
+                      idx % 2 === 0 ? "bg-[#020617]" : "bg-[#020617]/70"
                     }
                   >
-                    {/* Date */}
-                    <td className="px-3 py-2 text-slate-200">{t.date}</td>
+                    <td className="px-3 py-2 text-jr-text">{t.date}</td>
+                    <td className="px-3 py-2 text-jr-text">{t.instrument}</td>
+                    <td className="px-3 py-2 text-jr-text">{t.direction}</td>
 
-                    {/* Instrument */}
-                    <td className="px-3 py-2 text-slate-200">{t.instrument}</td>
-
-                    {/* Direction */}
-                    <td className="px-3 py-2 text-slate-200">{t.direction}</td>
-
-                    {/* Result in R */}
                     <td
                       className={
                         "px-3 py-2 text-right " +
                         (t.resultR > 0
-                          ? "text-emerald-400"
+                          ? "text-jr-profit"
                           : t.resultR < 0
-                          ? "text-red-400"
-                          : "text-slate-200")
+                          ? "text-jr-loss"
+                          : "text-jr-text")
                       }
                     >
                       {t.resultR.toFixed(2)}R
                     </td>
 
-                    {/* Setup */}
-                    <td className="px-3 py-2 text-slate-200">
+                    <td className="px-3 py-2 text-jr-text">
                       <span className="line-clamp-1 max-w-[140px]">
                         {t.setup}
                       </span>
                     </td>
 
-                    {/* Macro alignment */}
                     <td className="px-3 py-2">
                       <span
                         className={
                           "rounded-full px-2 py-0.5 text-[10px] font-semibold " +
                           (t.macroAlignment === "With"
-                            ? "bg-emerald-900/60 text-emerald-300"
+                            ? "bg-jr-profit/20 text-jr-profit"
                             : t.macroAlignment === "Against"
-                            ? "bg-amber-900/60 text-amber-300"
-                            : "bg-slate-800 text-slate-300")
+                            ? "bg-jr-warning/20 text-jr-warning"
+                            : "bg-jr-surface text-jr-muted")
                         }
                       >
                         {t.macroAlignment}
                       </span>
                     </td>
 
-                    {/* Followed plan badge */}
                     <td className="px-3 py-2">
                       <span
                         className={
                           "rounded-full px-2 py-0.5 text-[10px] font-semibold " +
                           (t.followedPlan
-                            ? "bg-emerald-900/60 text-emerald-300"
-                            : "bg-red-900/60 text-red-300")
+                            ? "bg-jr-profit/20 text-jr-profit"
+                            : "bg-jr-loss/20 text-jr-loss")
                         }
                       >
                         {t.followedPlan ? "YES" : "NO"}
                       </span>
                     </td>
 
-                    {/* Emotion */}
-                    <td className="px-3 py-2 text-slate-300">
+                    <td className="px-3 py-2 text-jr-muted">
                       <span className="line-clamp-1 max-w-[140px]">
                         {t.emotionNote}
                       </span>
                     </td>
 
-                    {/* Action: Edit button */}
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => startEdit(t)}
-                          className="rounded-md border border-slate-600 px-2 py-0.5 text-[10px] text-slate-200 hover:border-emerald-500 hover:text-emerald-300"
+                          className="rounded-md border border-jr-border px-2 py-0.5 text-[10px] text-jr-text hover:border-jr-primary hover:text-jr-primary-soft"
                         >
                           Edit
                         </button>
@@ -876,7 +880,7 @@ export default function JournalPage() {
                         <button
                           type="button"
                           onClick={() => deleteTrade(t.id)}
-                          className="rounded-md border border-slate-600 px-2 py-0.5 text-[10px] text-red-300 hover:border-red-500 hover:text-red-200"
+                          className="rounded-md border border-jr-border px-2 py-0.5 text-[10px] text-jr-loss hover:border-jr-loss hover:text-jr-loss"
                         >
                           Delete
                         </button>
@@ -889,7 +893,7 @@ export default function JournalPage() {
                   <tr>
                     <td
                       colSpan={9}
-                      className="px-3 py-4 text-center text-slate-500"
+                      className="px-3 py-4 text-center text-jr-muted"
                     >
                       No trades match the current filters.
                     </td>
