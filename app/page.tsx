@@ -5,6 +5,7 @@ import Papa, { ParseResult } from "papaparse";
 
 import {
   LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -16,7 +17,8 @@ import {
   BarChart,
   Bar,
   Legend,
-  Area,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
 
 import { events as initialEvents } from "./data/propData";
@@ -58,12 +60,7 @@ function monthLabel(monthKey: string) {
 }
 
 const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#6b7280"];
-
-// main dashboard card chrome
-const CARD_CLASS =
-  "relative overflow-hidden rounded-3xl border border-jr-border " +
-  "bg-gradient-to-b from-[#050816]/90 via-[#020617]/95 to-[#020617] " +
-  "px-5 py-4 shadow-[0_24px_60px_rgba(15,23,42,0.95)] backdrop-blur-xl";
+const SEGMENT_COLORS = ["#38BDF8", "#60A5FA", "#1D4ED8", "#22C55E", "#FACC15"];
 
 function formatValue(
   value: number,
@@ -93,7 +90,7 @@ function AccountSizeTooltip({
   const { name, count, percentage } = payload[0].payload;
 
   return (
-    <div className="rounded-md border border-jr-border bg-jr-surface px-3 py-2 text-xs text-jr-text">
+    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100">
       <div className="font-semibold">{name}</div>
       <div>
         {count} account{count !== 1 ? "s" : ""}
@@ -121,9 +118,8 @@ export default function Home() {
       skipEmptyLines: true,
       complete: (results: ParseResult<any>) => {
         const rows = results.data as any[];
-        // TODO: map your CSV rows into your event shape if you actually want to use this
+        // TODO: map CSV rows into your event shape when you feel like suffering
         console.log("Parsed CSV rows", rows);
-        // setRawEvents(mappedRows);
       },
       error: (error: unknown) => {
         console.error("Error parsing CSV", error);
@@ -229,7 +225,7 @@ export default function Home() {
       format: "currency",
     },
     {
-      label: "All-time payouts",
+      label: "All-time total payouts",
       value: totalPayouts,
       format: "currency",
     },
@@ -238,11 +234,11 @@ export default function Home() {
       value: -totalFees,
       format: "currency",
     },
-    { label: "Current PnL", value: currentPnl, format: "currency" },
+    { label: "Current PnL ($)", value: currentPnl, format: "currency" },
 
     { label: "Total evaluations", value: totalEvaluations, format: "int" },
     { label: "Active evaluations", value: activeEvaluations, format: "int" },
-    { label: "Active funded accounts", value: activeFundedAccs, format: "int" },
+    { label: "Active funded accs", value: activeFundedAccs, format: "int" },
     { label: "Failed challenges", value: failedChallenges, format: "int" },
 
     { label: "Phase 1 pass rate", value: phase1PassRate, format: "percent" },
@@ -273,13 +269,11 @@ export default function Home() {
       fees: -vals.fees,
     }));
 
-  /* ----- DAILY PNL HISTORY (CUMULATIVE) ----- */
+  /* ----- CUMULATIVE PNL HISTORY ----- */
 
   const pnlHistory = events
     .slice()
-    .sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() // oldest → newest
-    )
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .reduce((acc, ev) => {
       const last = acc.length ? acc[acc.length - 1].pnl : 0;
 
@@ -303,7 +297,6 @@ export default function Home() {
   const purchasedAccounts = filteredAccounts.filter(
     (a: any) => a.type === "evaluation"
   );
-
   const totalAccounts = purchasedAccounts.length;
 
   const sizeMap = new Map<string, number>();
@@ -318,6 +311,35 @@ export default function Home() {
       name,
       count,
       percentage: totalAccounts === 0 ? 0 : (count / totalAccounts) * 100,
+    })
+  );
+
+  /* ----- ACTIVE CHALLENGES DONUT DATA ----- */
+
+  const activeEvalAccounts = purchasedAccounts.filter((a: any) => a.isActive);
+
+  const totalActiveFunded = activeEvalAccounts.filter((a: any) =>
+    ["funded", "payout"].includes(a.stage)
+  ).length;
+
+  const segmentMap = new Map<string, { value: number; fundedCount: number }>();
+
+  activeEvalAccounts.forEach((acc: any) => {
+    const key = acc.propFirm;
+    const existing = segmentMap.get(key) ?? { value: 0, fundedCount: 0 };
+    existing.value += 1;
+    if (["funded", "payout"].includes(acc.stage)) {
+      existing.fundedCount += 1;
+    }
+    segmentMap.set(key, existing);
+  });
+
+  const segmentData = Array.from(segmentMap.entries()).map(
+    ([name, vals], idx) => ({
+      name,
+      value: vals.value,
+      fundedCount: vals.fundedCount,
+      fill: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
     })
   );
 
@@ -337,34 +359,29 @@ export default function Home() {
   /* ---------- JSX ---------- */
 
   return (
-    <main className="relative min-h-screen bg-jr-bg text-jr-text">
-      {/* background glow */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10
-          bg-[#020617]
-          bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.35),transparent_60%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.18),transparent_55%)]"
-      />
-
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6">
-        {/* HEADER */}
-        <header className="mb-1 flex flex-wrap items-center justify-between gap-4">
+    <main className="min-h-screen bg-jr-bg text-jr-text">
+      <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
+        {/* Header */}
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-jr-text">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
               Prop Firm Performance
             </h1>
-            <p className="mt-1 text-[11px] text-jr-muted">
-              Track challenges, payouts and fees across all your prop firms.
+            <p className="text-sm text-slate-400">
+              KPIs and charts filtered by prop firm. Events can be loaded from a
+              CSV.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-[11px]">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-jr-muted">Firm:</span>
+              <span className="text-xs text-slate-400">
+                Filter by prop firm:
+              </span>
               <select
                 value={selectedFirm}
                 onChange={(e) => setSelectedFirm(e.target.value)}
-                className="rounded-full border border-jr-border bg-jr-surface px-3 py-1 text-[11px] text-jr-text outline-none ring-0 focus:border-jr-primary"
+                className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
                 <option value="All">All</option>
                 {firms.map((firm) => (
@@ -376,107 +393,240 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-jr-muted">Load events CSV:</span>
+              <span className="text-xs text-slate-400">Load events CSV:</span>
               <input
                 type="file"
                 accept=".csv,text/csv"
                 onChange={handleEventsCsvChange}
-                className="text-[11px] text-jr-muted file:mr-2 file:rounded-full file:border file:border-jr-border file:bg-jr-surface file:px-3 file:py-1 file:text-[11px] file:text-jr-text hover:file:border-jr-primary"
+                className="text-xs text-slate-300 file:mr-2 file:rounded-md file:border file:border-slate-700 file:bg-slate-900 file:px-2 file:py-1 file:text-xs file:text-slate-100 hover:file:border-sky-500"
               />
             </div>
           </div>
         </header>
 
-        {/* KPI CARDS */}
+        {/* KPI cards */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi) => (
-            <div key={kpi.label} className={CARD_CLASS}>
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-jr-muted">
+            <div
+              key={kpi.label}
+              className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 shadow-[0_0_40px_rgba(15,23,42,0.7)]"
+            >
+              <p className="text-[11px] uppercase tracking-wide text-slate-400">
                 {kpi.label}
               </p>
-              <p className="mt-2 text-[18px] font-semibold text-jr-text">
+              <p className="mt-2 text-xl font-semibold text-slate-50">
                 {formatValue(kpi.value, kpi.format)}
               </p>
             </div>
           ))}
         </section>
 
-        {/* MAIN CHARTS */}
-        <section className="grid gap-6 lg:grid-cols-3">
-          {/* PnL chart */}
-          <div
-            className={`${CARD_CLASS} lg:col-span-2 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_60%)]`}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-jr-text">
-                Current PnL in USD
-              </h2>
-              <span className="text-[11px] text-jr-muted">
-                Payouts minus challenge fees
-              </span>
-            </div>
-
-            <div className="mt-3 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={pnlHistory}>
-                  <defs>
-                    <linearGradient id="pnlArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="0%"
-                        stopColor="#38bdf8"
-                        stopOpacity={0.45}
-                      />
-                      <stop offset="100%" stopColor="#38bdf8" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                  />
-                  <YAxis
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                    width={60}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#020617",
-                      border: "1px solid #1f2937",
-                      borderRadius: 12,
-                      fontSize: 11,
-                      color: "#e5e7eb",
-                    }}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey="pnl"
-                    stroke="#38bdf8"
-                    strokeWidth={2.6}
-                    fill="url(#pnlArea)"
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+        {/* PnL full-width */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 shadow-[0_0_50px_rgba(15,23,42,0.9)]">
+          <h2 className="mb-4 text-sm font-semibold text-slate-300">
+            Current PnL in USD (payouts minus challenge fees)
+          </h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={pnlHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
+                <XAxis
+                  dataKey="date"
+                  stroke="#9ca3af"
+                  tick={{ fontSize: 10 }}
+                  tickMargin={6}
+                />
+                <YAxis
+                  stroke="#9ca3af"
+                  tick={{ fontSize: 10 }}
+                  tickMargin={6}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#020617",
+                    border: "1px solid #1e293b",
+                    borderRadius: "0.75rem",
+                    color: "#e5e7eb",
+                    fontSize: "11px",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="pnl"
+                  stroke="#38bdf8"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
+        </section>
 
-          {/* Account size donut */}
-          <div className={CARD_CLASS}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-jr-text">
-                Account sizes (evaluations)
-              </h2>
-              <span className="text-[11px] text-jr-muted">
-                {totalAccounts} total
-              </span>
+        {/* Active challenges + account sizes */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          {/* Active challenges overview */}
+          <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">
+                  Active challenges overview
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Evaluation accounts by prop, visualized as a segmented ring.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end gap-1 text-[11px] text-slate-300">
+                <span className="rounded-full bg-slate-900/80 px-2 py-0.5">
+                  {activeEvalAccounts.length} active · {segmentData.length}{" "}
+                  props
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {totalAccounts} evaluations purchased in total
+                </span>
+              </div>
             </div>
 
-            <div className="mt-3 h-64">
+            <div className="mt-3 flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
+              {/* Donut */}
+              <div className="relative h-56 w-56 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="60%"
+                    outerRadius="90%"
+                    data={segmentData}
+                    startAngle={220}
+                    endAngle={-40}
+                  >
+                    <RadialBar
+                      dataKey="value"
+                      cornerRadius={30}
+                      minAngle={8}
+                      background
+                    />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+
+                {/* Center label */}
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                    Active
+                  </p>
+                  <p className="text-2xl font-semibold text-slate-50">
+                    {activeEvalAccounts.length}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-400">evaluations</p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    {activeEvalAccounts.length === 0
+                      ? "0% reached funded"
+                      : `${Math.round(
+                          (totalActiveFunded / activeEvalAccounts.length) * 100
+                        )}% reached funded`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="w-full max-w-xs space-y-2 text-[11px] md:max-w-sm">
+                {segmentData.length === 0 && (
+                  <p className="text-slate-500">
+                    No active evaluation accounts right now.
+                  </p>
+                )}
+
+                {segmentData.map((seg) => (
+                  <div
+                    key={seg.name}
+                    className="flex items-center justify-between rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1 shadow-sm shadow-slate-950/60"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: seg.fill }}
+                      />
+                      <span className="max-w-[120px] truncate text-slate-100">
+                        {seg.name}
+                      </span>
+                    </span>
+
+                    <span className="flex gap-2 text-slate-400">
+                      <span>{seg.value} active</span>
+                      {seg.fundedCount > 0 && (
+                        <span className="text-emerald-400">
+                          {seg.fundedCount} funded
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Active challenges list */}
+            <div className="mt-5 rounded-xl border border-slate-800/80 bg-slate-950/60">
+              <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-2 text-[11px] text-slate-400">
+                <span>Prop / challenge</span>
+                <span className="flex gap-8">
+                  <span>Size</span>
+                  <span>Stage</span>
+                </span>
+              </div>
+
+              <div className="max-h-56 overflow-auto text-xs">
+                {activeEvalAccounts.length === 0 ? (
+                  <div className="px-4 py-3 text-[11px] text-slate-500">
+                    No active challenges at the moment.
+                  </div>
+                ) : (
+                  activeEvalAccounts.map((acc: any) => (
+                    <div
+                      key={acc.id ?? `${acc.propFirm}-${acc.size}-${acc.stage}`}
+                      className="flex items-center justify-between border-b border-slate-800/60 px-4 py-2 last:border-0"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-medium text-slate-100">
+                          {acc.propFirm}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Evaluation
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-8 text-[11px]">
+                        <span className="text-slate-100">
+                          {acc.size.toLocaleString("en-US", {
+                            style: "currency",
+                            currency: "USD",
+                            maximumFractionDigits: 0,
+                          })}
+                        </span>
+                        <span className="rounded-full bg-slate-900/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">
+                          {acc.stage}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="border-t border-slate-800/80 px-4 py-2 text-[10px] text-slate-500">
+                Total evaluations purchased: {totalAccounts}
+              </div>
+            </div>
+          </section>
+
+          {/* Account sizes donut */}
+          <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <h2 className="mb-1 text-sm font-semibold text-slate-300">
+              Account sizes (evaluations)
+            </h2>
+            <p className="mb-3 text-[11px] text-slate-400">
+              Total accounts purchased: {totalAccounts}
+            </p>
+
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -499,7 +649,6 @@ export default function Home() {
                     layout="horizontal"
                     verticalAlign="bottom"
                     align="center"
-                    wrapperStyle={{ fontSize: 11, color: "#9ca3af" }}
                     formatter={(value, entry: any) => {
                       const item = entry.payload;
                       return `${item.name} (${
@@ -510,14 +659,13 @@ export default function Home() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </section>
         </section>
 
-        {/* BOTTOM CHARTS */}
+        {/* Bottom charts */}
         <section className="grid gap-6 lg:grid-cols-2">
-          {/* Payouts by firm */}
-          <div className={CARD_CLASS}>
-            <h2 className="mb-3 text-xs font-semibold text-jr-text">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <h2 className="mb-4 text-sm font-semibold text-slate-300">
               Payouts by prop firm
             </h2>
             <div className="h-72">
@@ -528,84 +676,56 @@ export default function Home() {
                   margin={{ left: 80 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
-                  <XAxis
-                    type="number"
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                  />
+                  <XAxis type="number" stroke="#9ca3af" />
                   <YAxis
                     dataKey="firm"
                     type="category"
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    stroke="#9ca3af"
                     width={160}
                   />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#020617",
-                      border: "1px solid #1f2937",
-                      borderRadius: 12,
-                      fontSize: 11,
+                      border: "1px solid #1e293b",
+                      borderRadius: "0.5rem",
                       color: "#e5e7eb",
                     }}
                   />
-                  <Bar dataKey="payouts" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="payouts" fill="#22c55e" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Monthly payouts vs fees */}
-          <div className={CARD_CLASS}>
-            <h2 className="mb-3 text-xs font-semibold text-jr-text">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <h2 className="mb-4 text-sm font-semibold text-slate-300">
               Monthly payouts vs challenge fees
             </h2>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyPerf}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#111827" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                  />
-                  <YAxis
-                    stroke="#6b7280"
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                  />
+                  <XAxis dataKey="month" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#020617",
-                      border: "1px solid #1f2937",
-                      borderRadius: 12,
-                      fontSize: 11,
+                      border: "1px solid #1e293b",
+                      borderRadius: "0.5rem",
                       color: "#e5e7eb",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#9ca3af" }} />
-                  <Bar
-                    dataKey="payouts"
-                    name="Payouts"
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="fees"
-                    name="Challenge fees"
-                    fill="#ef4444"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Legend />
+                  <Bar dataKey="payouts" name="Payouts" fill="#3b82f6" />
+                  <Bar dataKey="fees" name="Challenge fees" fill="#ef4444" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </section>
 
-        {/* EVENTS TABLE */}
-        <section className={CARD_CLASS}>
-          <h2 className="mb-3 text-xs font-semibold text-jr-text">
-            Events (payouts & fees)
-          </h2>
+        {/* Events table */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
           <EventsTable events={events as any} />
         </section>
       </div>
