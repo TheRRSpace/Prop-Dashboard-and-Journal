@@ -354,11 +354,9 @@ export default function JournalPage() {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              Trading journal
+              RR journal
             </h1>
-            <p className="text-sm text-slate-400">
-              Track R, discipline, and macro alignment like an adult trader.
-            </p>
+            <p className="text-sm text-slate-400">Track it baby! Track it!</p>
           </div>
           <button
             type="button"
@@ -467,7 +465,8 @@ export default function JournalPage() {
               {editingId ? "Edit trade" : "Log trade"}
             </h2>
             <p className="mb-3 text-[11px] text-slate-400">
-              Only key inputs. The heavy analysis lives in the table and stats.
+              Only key inputs baby. The heavy analysis lives in the table and
+              stats.
             </p>
 
             {showForm ? (
@@ -695,10 +694,6 @@ export default function JournalPage() {
                     “Log new trade”
                   </span>{" "}
                   in the header to open the form.
-                </p>
-                <p>
-                  Recommended: log only executed trades, not screenshots of
-                  fantasies.
                 </p>
               </div>
             )}
